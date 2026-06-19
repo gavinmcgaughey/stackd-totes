@@ -90,10 +90,20 @@ export default function AdminDashboard() {
     router.refresh();
   }
 
+  const [search, setSearch] = useState("");
+
   const pendingCount = orders.filter((o) => o.status === "pending").length;
   const upcoming = orders.filter(
     (o) => o.status !== "cancelled" && o.delivery_date >= toISODate(today),
   ).length;
+
+  const filteredOrders = search.trim()
+    ? orders.filter(
+        (o) =>
+          o.confirmation_code?.toLowerCase().includes(search.toLowerCase()) ||
+          o.customer_name.toLowerCase().includes(search.toLowerCase()),
+      )
+    : orders;
 
   return (
     <div className="mx-auto max-w-6xl px-5 py-12">
@@ -160,7 +170,16 @@ export default function AdminDashboard() {
 
         {/* Orders table */}
         <section className="min-w-0">
-          <h2 className="font-bold text-ink">Bookings</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-bold text-ink">Bookings</h2>
+            <input
+              type="text"
+              placeholder="Search by code or name…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="rounded-lg border border-line bg-background px-3 py-1.5 text-sm text-ink outline-none focus:border-brand"
+            />
+          </div>
           {loading ? (
             <p className="mt-4 text-sm text-muted">Loading…</p>
           ) : orders.length === 0 ? (
@@ -172,6 +191,7 @@ export default function AdminDashboard() {
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="bg-surface text-xs uppercase tracking-wide text-muted">
                   <tr>
+                    <th className="px-4 py-3 font-medium">Code</th>
                     <th className="px-4 py-3 font-medium">Customer</th>
                     <th className="px-4 py-3 font-medium">Package</th>
                     <th className="px-4 py-3 font-medium">Delivery</th>
@@ -180,8 +200,13 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-line">
-                  {orders.map((o) => (
+                  {filteredOrders.map((o) => (
                     <tr key={o.id} className="align-top">
+                      <td className="px-4 py-3">
+                        <span className="font-mono text-xs font-semibold text-brand">
+                          {o.confirmation_code ?? "—"}
+                        </span>
+                      </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-ink">{o.customer_name}</p>
                         <p className="text-xs text-muted">{o.phone}</p>
