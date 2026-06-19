@@ -29,6 +29,7 @@ create index if not exists orders_delivery_idx on public.orders (delivery_date);
 -- If you already created the orders table before adding Stripe, these are safe to re-run:
 alter table public.orders add column if not exists paid boolean not null default false;
 alter table public.orders add column if not exists stripe_session_id text;
+alter table public.orders add column if not exists confirmation_code text;
 
 -- Dates the owner has manually blocked off
 create table if not exists public.blocked_dates (

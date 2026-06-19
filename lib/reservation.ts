@@ -4,6 +4,13 @@ import { eachDateInRange } from "./dates";
 import { computePrice } from "./pricing";
 import type { Order } from "./types";
 
+function generateConfirmationCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "STK-";
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  return code;
+}
+
 export type ReservationResult =
   | { ok: true; order: Order; pkg: Package }
   | { ok: false; status: number; error: string };
@@ -43,31 +50,24 @@ export async function createReservation(
     };
   }
 
-  // Double-booking guard.
+  // Guard against manually blocked dates.
   const wanted = eachDateInRange(delivery_date, pickup_date);
-  const [{ data: blocked }, { data: actives }] = await Promise.all([
-    supabase.from("blocked_dates").select("date"),
-    supabase
-      .from("orders")
-      .select("delivery_date, pickup_date")
-      .in("status", ["pending", "confirmed"]),
-  ]);
+  const { data: blocked } = await supabase.from("blocked_dates").select("date");
   const taken = new Set<string>();
   (blocked ?? []).forEach((b: { date: string }) => taken.add(b.date));
-  (actives ?? []).forEach((o: { delivery_date: string; pickup_date: string }) =>
-    eachDateInRange(o.delivery_date, o.pickup_date).forEach((d) => taken.add(d)),
-  );
   if (wanted.some((d) => taken.has(d))) {
     return {
       ok: false,
       status: 409,
-      error: "Sorry — those dates were just taken. Please pick another range.",
+      error: "Sorry — those dates are unavailable. Please pick another range.",
     };
   }
 
   // Authoritative price — computed server-side from the dates, never trusted
   // from the client.
   const { total } = computePrice(pkg, delivery_date, pickup_date);
+
+  const confirmation_code = generateConfirmationCode();
 
   const { data, error } = await supabase
     .from("orders")
@@ -85,6 +85,7 @@ export async function createReservation(
       notes,
       status: "pending",
       paid: false,
+      confirmation_code,
     })
     .select()
     .single();

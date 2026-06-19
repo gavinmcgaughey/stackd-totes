@@ -7,7 +7,11 @@ export const metadata: Metadata = {
   robots: { index: false },
 };
 
-export default function SuccessPage() {
+export default function SuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center px-5 py-24 text-center">
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-brand/10">
@@ -21,6 +25,7 @@ export default function SuccessPage() {
         confirmation and we&apos;ll be in touch shortly to lock in your delivery
         window. No cardboard, no waste, no hassle.
       </p>
+      <ConfirmationCode searchParams={searchParams} />
       <div className="mt-8 flex flex-wrap justify-center gap-3">
         <Link
           href="/"
@@ -35,6 +40,24 @@ export default function SuccessPage() {
           View pricing
         </Link>
       </div>
+    </div>
+  );
+}
+
+async function ConfirmationCode({
+  searchParams,
+}: {
+  searchParams: Promise<{ code?: string }>;
+}) {
+  const { code } = await searchParams;
+  if (!code) return null;
+  return (
+    <div className="mt-6 rounded-xl border-2 border-brand bg-brand/5 px-8 py-4">
+      <p className="text-xs font-medium uppercase tracking-widest text-muted">
+        Confirmation code
+      </p>
+      <p className="mt-1 text-2xl font-bold tracking-widest text-brand">{code}</p>
+      <p className="mt-1 text-xs text-muted">Save this — it&apos;s also in your email.</p>
     </div>
   );
 }

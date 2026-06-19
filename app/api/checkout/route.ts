@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     } catch (e) {
       console.error("[checkout] email failed", e);
     }
-    return NextResponse.json({ url: "/order/success" });
+    return NextResponse.json({ url: `/order/success?code=${order.confirmation_code}` });
   }
 
   // --- Stripe Checkout ---

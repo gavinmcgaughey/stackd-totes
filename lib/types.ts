@@ -17,6 +17,7 @@ export type Order = {
   status: OrderStatus;
   paid: boolean;
   stripe_session_id: string | null;
+  confirmation_code: string;
 };
 
 export type BlockedDate = {
