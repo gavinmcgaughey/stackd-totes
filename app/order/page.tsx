@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 export default async function OrderPage({
   searchParams,
 }: {
-  searchParams: Promise<{ package?: string }>;
+  searchParams: Promise<{ package?: string; canceled?: string }>;
 }) {
   const sp = await searchParams;
   const initialPackageId =
@@ -32,7 +32,10 @@ export default async function OrderPage({
         </p>
       </div>
       <div className="mt-10">
-        <OrderForm initialPackageId={initialPackageId} />
+        <OrderForm
+          initialPackageId={initialPackageId}
+          canceled={Boolean(sp.canceled)}
+        />
       </div>
     </div>
   );
