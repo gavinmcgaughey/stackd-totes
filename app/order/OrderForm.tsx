@@ -6,8 +6,9 @@ import { DayPicker, type DateRange } from "react-day-picker";
 import "react-day-picker/style.css";
 import { Check, Loader2, CalendarDays, AlertCircle } from "lucide-react";
 import { PACKAGES, getPackage } from "@/lib/packages";
-import { toISODate, fromISODate, prettyDate } from "@/lib/dates";
+import { toISODate, fromISODate, prettyDate, addCalendarDays } from "@/lib/dates";
 import { computePrice } from "@/lib/pricing";
+import { rangeAfterDayClick } from "@/lib/order-range";
 
 const inputClass =
   "w-full rounded-xl border border-line bg-background px-4 py-3 text-sm text-ink outline-none transition-colors focus:border-brand focus:ring-2 focus:ring-brand/20 placeholder:text-muted/70";
@@ -15,7 +16,13 @@ const inputClass =
 // Set NEXT_PUBLIC_STRIPE_ENABLED=true once Stripe keys are connected.
 const PAYMENTS_ON = process.env.NEXT_PUBLIC_STRIPE_ENABLED === "true";
 
-export function OrderForm({ initialPackageId }: { initialPackageId: string }) {
+export function OrderForm({
+  initialPackageId,
+  canceled = false,
+}: {
+  initialPackageId: string;
+  canceled?: boolean;
+}) {
   const router = useRouter();
   const [packageId, setPackageId] = useState(initialPackageId);
   const [range, setRange] = useState<DateRange | undefined>();
@@ -30,23 +37,16 @@ export function OrderForm({ initialPackageId }: { initialPackageId: string }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [canceled, setCanceled] = useState(false);
 
   const pkg = getPackage(packageId);
+  const includedDays = (pkg?.weeks ?? 2) * 7;
 
   // Live price breakdown based on the selected dates (matches the server).
   const breakdown = useMemo(() => {
     if (!pkg || !range?.from) return null;
-    const to = range.to ?? range.from;
+    const to = range.to ?? addCalendarDays(range.from, includedDays);
     return computePrice(pkg, toISODate(range.from), toISODate(to));
-  }, [pkg, range]);
-
-  // Show a notice if the customer bailed out of Stripe Checkout.
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("canceled")) {
-      setCanceled(true);
-    }
-  }, []);
+  }, [pkg, range, includedDays]);
 
   // Tomorrow is the earliest bookable day.
   const tomorrow = useMemo(() => {
@@ -80,7 +80,7 @@ export function OrderForm({ initialPackageId }: { initialPackageId: string }) {
     if (!pkg) return setError("Please choose a package.");
     if (!range?.from) return setError("Please choose your delivery date.");
     const from = range.from;
-    const to = range.to ?? range.from;
+    const to = range.to ?? addCalendarDays(range.from, includedDays);
     if (!form.customer_name || !form.email || !form.phone || !form.address) {
       return setError("Please fill in your name, email, phone, and address.");
     }
@@ -157,20 +157,35 @@ export function OrderForm({ initialPackageId }: { initialPackageId: string }) {
             Pick delivery &amp; pickup dates
           </h2>
           <p className="mt-1.5 text-sm text-muted">
-            Click your <strong>delivery</strong> day, then your <strong>pickup</strong> day.
-            Crossed-out dates are unavailable.
+            Click your <strong>delivery</strong> day. Pickup defaults to{" "}
+            {pkg?.weeks ?? 2} weeks later (included). Click a later day to keep
+            the totes longer. Crossed-out dates are unavailable.
           </p>
           <div className="mt-4 inline-block rounded-2xl border border-line bg-background p-3">
             <DayPicker
               mode="range"
               selected={range}
-              onSelect={setRange}
+              onSelect={(_next, selectedDay) => {
+                if (!selectedDay) return;
+                setRange((prev) =>
+                  rangeAfterDayClick(prev, selectedDay, includedDays),
+                );
+              }}
               disabled={disabledDays}
               excludeDisabled
               startMonth={tomorrow}
               numberOfMonths={1}
             />
           </div>
+          {range?.from && (
+            <button
+              type="button"
+              onClick={() => setRange(undefined)}
+              className="mt-2 text-sm font-medium text-muted underline-offset-2 hover:text-ink hover:underline"
+            >
+              Clear dates
+            </button>
+          )}
         </section>
 
         {/* Step 3 — details */}
@@ -208,7 +223,7 @@ export function OrderForm({ initialPackageId }: { initialPackageId: string }) {
               <CalendarDays className="h-4 w-4 text-brand" />
               <span>{range?.to ? prettyDate(toISODate(range.to)) : "Pickup date"}</span>
             </div>
-            {range?.to && breakdown && (
+            {range?.from && breakdown && (
               <p className="pl-6 text-xs text-muted">
                 Billed as {breakdown.billedWeeks} week
                 {breakdown.billedWeeks > 1 ? "s" : ""}
@@ -224,13 +239,18 @@ export function OrderForm({ initialPackageId }: { initialPackageId: string }) {
               </span>
               <span>${breakdown?.base ?? pkg?.price ?? 0}</span>
             </div>
-            {breakdown && breakdown.extraWeeks > 0 && (
+            {breakdown && breakdown.extraWeeks > 0 ? (
               <div className="flex justify-between text-muted">
                 <span>
                   + {breakdown.extraWeeks} extra week
                   {breakdown.extraWeeks > 1 ? "s" : ""} (${breakdown.extraWeekPrice}/wk)
                 </span>
                 <span>${breakdown.extra}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between text-muted">
+                <span>Extra weeks</span>
+                <span>+${pkg?.extraWeekPrice ?? 0}/wk after {pkg?.weeks ?? 2} wks</span>
               </div>
             )}
             <div className="flex items-baseline justify-between border-t border-line pt-3">
@@ -241,11 +261,6 @@ export function OrderForm({ initialPackageId }: { initialPackageId: string }) {
                 ${breakdown?.total ?? pkg?.price ?? 0}
               </span>
             </div>
-            {!range?.to && (
-              <p className="text-xs text-muted">
-                Pick your pickup date to see the full total.
-              </p>
-            )}
           </div>
 
           {canceled && (

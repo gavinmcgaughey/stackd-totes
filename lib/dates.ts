@@ -12,6 +12,21 @@ export function fromISODate(s: string): Date {
   return new Date(y, m - 1, d, 12, 0, 0, 0);
 }
 
+/** Local calendar day at noon (avoids DST / TZ off-by-one). */
+export function startOfLocalDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12, 0, 0, 0);
+}
+
+export function addCalendarDays(d: Date, days: number): Date {
+  const next = startOfLocalDay(d);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+export function isSameLocalDay(a: Date, b: Date): boolean {
+  return toISODate(a) === toISODate(b);
+}
+
 /** Every YYYY-MM-DD between start and end, inclusive. */
 export function eachDateInRange(startISO: string, endISO: string): string[] {
   const out: string[] = [];
